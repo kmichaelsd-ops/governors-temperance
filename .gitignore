@@ -1,0 +1,9 @@
+# Quarto generated files
+*_files/
+.quarto/
+
+# R session and plot files
+.Rhistory
+.RData
+.Ruserdata
+Rplots.pdf

@@ -51,17 +51,26 @@ The setup chunk of this document carries forward the work from Wisdom and Courag
 
 Use `predictions(fit_governors)` to estimate the years lived after the election for individual candidates in the sample.
 
-
+```{r}
+predictions(fit_governors) |>
+  as_tibble()
+```
 
 Use `avg_predictions(fit_governors, by = "election_result")` to estimate the average years lived after the election for winners and losers.
 
+```{r}
+avg_predictions(fit_governors, by = "election_result") |>
+  as_tibble()
+```
 
 
 What is the expected number of years lived after the election for a losing candidate (with 95% CI)?
 
-
+A losing candidate is expected to live **27.2 years** after the election (95% CI: **[25.2, 29.2]**).
 
 What is the expected number of years lived after the election for a winning candidate (with 95% CI)?
+
+A winning candidate is expected to live **29.6 years** after the election (95% CI: **[27.7, 31.5]**).
 
 
 
@@ -69,9 +78,16 @@ What is the expected number of years lived after the election for a winning cand
 
 Use `avg_comparisons(fit_governors, variables = "election_result")` to estimate the effect of winning on years lived after the election.
 
-
+```{r}
+avg_comparisons(fit_governors, variables = "election_result") |>
+  as_tibble()
+```
 
 Why is the estimate from `avg_comparisons()` so much larger than the difference between the two group averages from `avg_predictions()`?
+
+The difference between the group average predictions (2.4 years) is calculated using the observed values of the covariates in our sample, where winners and losers have different covariate distributions. Most importantly, winners have positive win margins (0 to 5) and losers have negative win margins (-5 to 0). Since `win_margin` has a negative coefficient of -1.46, the positive win margins of winners lower their predicted lifespans, while the negative win margins of losers increase their predicted lifespans, pulling the two group averages closer together. 
+
+In contrast, `avg_comparisons()` computes the average causal effect (treatment effect) by comparing the predicted lifespans under the 'Win' vs. 'Lose' conditions for each candidate while holding all other covariates (including `win_margin`) constant. This isolates the true treatment coefficient of winning, which is **8.63 years**.
 
 
 
@@ -79,13 +95,62 @@ Why is the estimate from `avg_comparisons()` so much larger than the difference 
 
 Create a visualization of the average predictions by election result using `plot_predictions()`.
 
+```{r}
+plot_predictions(fit_governors, condition = "election_result") +
+  theme_minimal(base_family = "sans") +
+  labs(
+    title = "Average Predicted Post-Election Lifespan",
+    subtitle = "Group averages differ by 2.4 years, but the adjusted effect of winning is 8.6 years",
+    x = "Election Result",
+    y = "Predicted Years Lived After Election"
+  ) +
+  aes(color = election_result) +
+  scale_color_manual(values = c("Lose" = "#E66101", "Win" = "#5E3C99")) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13, margin = margin(b = 6)),
+    plot.subtitle = element_text(color = "grey35", size = 9, margin = margin(b = 12)),
+    legend.position = "none",
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "grey93"),
+    axis.title = element_text(size = 10, face = "bold"),
+    axis.text = element_text(size = 9.5)
+  )
+```
+
 
 
 What measure of uncertainty is shown in this plot?
 
+The plot displays the **95% confidence intervals** around the average predictions, represented by the vertical error bars (point ranges).
+
 
 
 Create a plot showing predicted years lived after the election as a function of `election_age`, separately for winners and losers.
+
+```{r}
+plot_predictions(fit_governors, condition = c("election_age", "election_result")) +
+  theme_minimal(base_family = "sans") +
+  labs(
+    title = "Expected Post-Election Lifespan by Age and Result",
+    subtitle = "Winners live consistently longer than losers across all ages, adjusting for covariates",
+    x = "Age at Election (Years)",
+    y = "Predicted Years Lived After Election",
+    colour = "Election Result",
+    fill = "Election Result"
+  ) +
+  scale_color_manual(values = c("Lose" = "#E66101", "Win" = "#5E3C99")) +
+  scale_fill_manual(values = c("Lose" = "#E66101", "Win" = "#5E3C99")) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13, margin = margin(b = 6)),
+    plot.subtitle = element_text(color = "grey35", size = 9, margin = margin(b = 12)),
+    legend.position = "top",
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(color = "grey93"),
+    axis.title = element_text(size = 10, face = "bold"),
+    axis.text = element_text(size = 8.5)
+  )
+```
 
 
 
@@ -93,12 +158,27 @@ Create a plot showing predicted years lived after the election as a function of 
 
 How does the life insurer interpret the estimated effect of winning? How does the researcher interpret the same number differently?
 
+- **Life Insurer (Predictive Interpretation):** The insurer views the 8.6-year estimate purely as a predictive adjustment. Knowing that a Senate candidate won the election is a useful signal for forecasting their longevity. It does not matter *why* winners live longer, only that winning is a strong predictor to help price policies and manage liabilities.
+- **Researcher (Causal Interpretation):** The researcher interprets the 8.6-year estimate as the average causal effect of winning office. Because close elections mimic a randomized experiment (a regression discontinuity design), they assume winning *causes* candidates to live longer, likely due to increased wealth, access to better healthcare, higher social status, or reduced stress.
+
 
 
 ### Humility
 
 Besides the average years lived, identify two additional quantities of interest the person in your scenario might care about.
 
-
+- **Life Insurer:** 
+  1. The probability of surviving past a certain age threshold (e.g., 75 or 80 years) to price annuities.
+  2. The standard deviation or variance of post-election lifespans to assess risk and tail longevity probabilities.
+- **Researcher:** 
+  1. The heterogeneous treatment effects (e.g., does winning benefit younger candidates more than older ones, or Democrats more than Republicans?).
+  2. The effect of winning on health-adjusted life years (quality of life) rather than just raw lifespan.
 
 Why might these estimates be a poor answer to your scenario's question? Identify at least two possible sources of bias.
+
+- **Life Insurer:**
+  1. **Representativeness Bias:** The model is estimated on gubernatorial candidates from 1945–2012, which may not generalize to this year's Senate candidates due to differences between offices and modern medical advancements.
+  2. **Selection Bias:** The model is fit only on close elections ($\le 5\%$ margin). If the relationship between winning and longevity is different in landslide elections, the model will produce poor forecasts for candidates running in non-close races.
+- **Researcher:**
+  1. **Generalizability Bias (External Validity):** The causal effect for governors may not generalize to other elected offices like mayors or school board members, where the stress, resources, and prestige differ.
+  2. **Confounding Bias:** Even in close elections, winning might not be perfectly random. If candidates who win close elections differ systematically from those who lose (e.g., having more physical resilience or better party support), unobserved factors could bias the causal estimate.
